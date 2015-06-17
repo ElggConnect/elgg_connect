@@ -21,13 +21,28 @@
 function status_user()
 {
 
+	$lastrequest = elggconnect_get_lastrequest();
+
     if (elgg_is_active_plugin('chat')) {
 
+		$cmc = chat_messages_count(false);
+		$cmn = chat_messages_count($lastrequest);
+		
+		if($cmn == 1) {
+			$cmt = elgg_echo('elggconnect:chat:new:singular');
+		} else if ($cmn > 1 ) {
+			$cmt = elgg_echo('elggconnect:chat:new:plural',array($cmn));
+		} else {
+			$cmt = '';	
+		}
+		
         $return[] = array("object" => array(
             "type" => "notification",
-            "count" => chat_messages_count(),
+            "count" => $cmc,
+            "new" => $cmn,
+            "text" => $cmt,
             "url" => "chat/all",
-            "name" => "Messages",
+            "name" => elgg_echo('elggconnect:chat:name'),
             /*
             "items" => chat_messages_get(),
             */
@@ -36,11 +51,24 @@ function status_user()
 
     if (elgg_is_active_plugin('site_notifications')) {
 
+        $noc = notifications_count(false);
+        $non = notifications_count($lastrequest);
+
+		if($non == 1) {
+			$not = elgg_echo('elggconnect:notification:new:singular');
+		} else if ($non > 1 ) {
+			$not = elgg_echo('elggconnect:notification:new:plural',array($non));
+		} else {
+			$not = '';	
+		}
+
         $return[] = array("object" => array(
             "type" => "notification",
-            "count" => notifications_count(),
+            "count" => $noc,
+            "new" => $non,
+            "text" => $not,
             "url" => "site_notifications/view/",
-            "name" => "Notifications",
+            "name" => elgg_echo('elggconnect:notification:name'),
             /*
             "items" => notifications_get(),
             */
@@ -54,7 +82,7 @@ function status_user()
                 "type" => "shortcut",
                 "count" => 0,
                 "url" => "user_support/support_ticket",
-                "name" => "Support tickets (" . user_support_count() . ")",
+                "name" => elgg_echo('elggconnect:supportticket:name',array(user_support_count())),
             ));
         }
     }
@@ -80,6 +108,8 @@ function status_user()
                 "name" => $menuText,
             ));		
 	}
+	
+	elggconnect_set_lastrequest();
 
     return $return;
 }
@@ -99,18 +129,24 @@ elgg_ws_expose_function('status.user',
  *
  * if return value is -1 chat plugin is not active
  */
-function chat_messages_count()
+function chat_messages_count($lastrequest = false)
 {
     $user_guid = elgg_get_logged_in_user_guid();
 
-    return elgg_get_entities_from_relationship(array(
+	$options = array(
         'type' => 'object',
         'subtype' => 'chat_message',
         'count' => true,
         'relationship' => 'unread',
         'relationship_guid' => $user_guid,
-        'inverse_relationship' => true,
-    ));
+        'inverse_relationship' => true);
+     
+     if($lastrequest != false){
+		$options['created_time_lower'] = $lastrequest;
+		$options['created_time_upper'] = time();
+     }
+
+    return elgg_get_entities_from_relationship($options);
 
 }
 
@@ -170,12 +206,12 @@ function chat_messages_get()
  *  * if return value is -1 chat plugin is not active
 
  */
-function notifications_count()
+function notifications_count($lastrequest = false)
 {
 
     $owner_guid = elgg_get_logged_in_user_guid();
 
-    return elgg_get_entities_from_metadata(array(
+    $options = array(
         'type' => 'object',
         'subtype' => 'site_notification',
         'owner_guid' => $owner_guid,
@@ -183,8 +219,14 @@ function notifications_count()
         'metadata_name' => 'read',
         'metadata_value' => false,
         'count' => true
-    ));
+    );
 
+     if($lastrequest != false){
+		$options['created_time_lower'] = $lastrequest;
+		$options['created_time_upper'] = time();
+     }
+
+	return elgg_get_entities_from_metadata($options);
 
 }
 
@@ -265,5 +307,14 @@ elgg_set_ignore_access($ia);
 
 }
 
+function elggconnect_get_lastrequest() {
+	$user = elgg_get_logged_in_user_entity();
+	return $user->elggconnectlastrequest;
+}
+
+function elggconnect_set_lastrequest() {
+	$user = elgg_get_logged_in_user_entity();
+	$user->elggconnectlastrequest = time();
+}
 
 
